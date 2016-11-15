@@ -1,18 +1,16 @@
 # get the dataset
-library('data.table')
-library('tidytext')
-library('magrittr')
-library(dplyr)
-library(dtplyr)
-library("tibble")
-
-libraries = c('tm', 'rJava')
-lapply (libraries, function (x) library(x,character.only = TRUE))
+require('data.table')
+require('tidytext')
+require('magrittr')
+require(dplyr)
+require(dtplyr)
+require("tibble")
+library("tm")
 
 # get the dataset from web and unzip it
-a = download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',temp)
-unzip(a)
-rm(a)
+a = download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',destfile = "temp")
+unzip('temp')
+
 
 # build a support table with the file info
 # name of files
@@ -33,8 +31,8 @@ filename  = fileinfo$files[5]
 
 mytokenization <- function(filename) {
   j= fread(input = filename, sep = '\n', header = FALSE, stringsAsFactors = FALSE, col.names = "stuff", colClasses = "character", nrows = round(fileinfo$length[match(filename,fileinfo$files)]*0.05,0) )
-  k = j %>%  unnest_tokens(word, stuff)
-  return(k)
+  k <- j %>% as_tibble() %>% unnest_tokens(word, stuff) %>% anti_join(stop_words,by = "word")
+  k %>% count(word, sort = TRUE)
   }
 
 my
