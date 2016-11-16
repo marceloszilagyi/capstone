@@ -7,9 +7,6 @@ require(dtplyr)
 require("tibble")
 library("tm")
 
-# get the dataset from web and unzip it
-a = download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',destfile = "temp")
-unzip('temp')
 
 
 # build a support table with the file info
@@ -23,8 +20,10 @@ fileinfo = cbind.data.frame(files = as.character(files),length,stringsAsFactors 
 fileinfo$language = ifelse(grepl(fileinfo$files,pattern = "en_"),"en", 
                            ifelse(grepl(fileinfo$files,pattern = "de_"),"de",
                                   ifelse(grepl(fileinfo$files,pattern = "fi_"),"fi", "ru")))
+# a 5% sample size
+fileinfo$sampleszile = ifelse(fileinfo$length*0.05>3000,round(fileinfo$length*0.05,0),3000)
+                        
                                                                                             
-
 
 # selects one of the files to be used  - in the future, just replace it with a loop for all files
 filename  = fileinfo$files[5]
@@ -51,6 +50,13 @@ j = data_frame(j$stuff)
 
 
 scan(fileinfo$files[1], '', skip = 6, nlines = 1, sep = '\n')
+
+con <- file("en_US.twitter.txt", "r") 
+readLines(con, 1) ## Read the first line of text 
+readLines(con, 1) ## Read the next line of text 
+readLines(con, 5) ## Read in the next 5 lines of text 
+close(con) ## It's important to close the connection when you are done
+
 
 
 

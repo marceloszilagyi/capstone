@@ -1,0 +1,110 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Load the librarys
+[todo] write a better wrappers for library loader
+
+```{r, cache=TRUE}
+require('data.table');require('tidytext');require('magrittr');require(dplyr);require(dtplyr)
+require("tibble");library("tm"); library("stringr")
+```
+
+get data from website and unzip
+
+```{r, cache=TRUE}
+# get the dataset from web and unzip it
+download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',destfile = "temp")
+unzip('temp')
+```
+
+Build a support table with the file names, the number of lines, the language and the sample size
+[todo] write a nice regex function for the name, lengh with memory control
+
+```{r, cache=TRUE}
+
+# name of files
+files = list.files(recursive = TRUE, pattern = glob2rx('*.txt'))
+length = suppressWarnings(sapply(files, function (x) length(readLines(x))))
+# language of each file (this needs a better grep in the future)
+fileinfo = cbind.data.frame(files = as.character(files),length,stringsAsFactors = FALSE)
+fileinfo$language = ifelse(grepl(fileinfo$files,pattern = "en_"),"en", 
+                           ifelse(grepl(fileinfo$files,pattern = "de_"),"de",
+                                  ifelse(grepl(fileinfo$files,pattern = "fi_"),"fi", "ru")))
+# a 5% sample size
+fileinfo$sampleszile = ifelse(fileinfo$length*0.05>3000,round(fileinfo$length*0.05,0),3000)
+
+```
+
+Write a function that performs tokenization - identifying appropriate tokens such as words, punctuation, and numbers profanity filtering - removing profanity and other words you do not want to predict
+
+```{r, cache=TRUE}
+# get the bad word list 
+download.file('https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en',"badwords.txt")
+badwords = as_tibble(read.csv('badwords.txt')); colnames(badwords) <- "word"
+
+```
+
+```{r, cache=TRUE}
+mytokenization <- function(filename, nrows=-1) {
+  
+  # get the file using data.table fast import
+   nrows = nrows
+   j= readLines(con = filename,warn = FALSE)
+   j = as.data.table(j)
+   colnames(j) <- "text"
+   if(nrows != -1) { tempselect = sample(size = nrows, nrow(j))} 
+   if(nrows != -1) { j = j[tempselect]}
+ 
+    # use tidytext approach to determine token; use anti_join to avoid wording and bad words
+  # tip - can use this in the future to filter out more words (anti_join)
+  k <- j %>% as_tibble() %>% unnest_tokens(word, text) %>% 
+            anti_join(stop_words,by = "word") %>% 
+    anti_join(badwords, by = "word")
+  
+  # return the tokenization
+  k %>% count(word, sort = TRUE)
+  }
+
+test = mytokenization(fileinfo$files[4],5000)
+
+```
+
+Write a function with the max, min or avg number of characters in a given file
+```{r}
+textcalculator <- function(file, calculationastext) {
+  j= readLines(con = filename,warn = FALSE)
+  j = as.data.table(j)
+   colnames(j) <- "text
+  j = j[, numchar := nchar(text)] #using data.table syntax
+  # get the function from the character
+  f <- match.fun(calculationastext)
+  f(j$numchar)
+}
+```
+
+Write a function to find a certain text in the file
+```{r}
+textfinder <- function(file, text, choice =1 ) {
+ j= readLines(con = filename,warn = FALSE)
+ j = as.data.table(j)
+  colnames(j) <- "text
+  
+  if (choice==1) {str_subset(j, text)}
+  if (choice==2) {str_locate(j, text)}
+  if (choice==3) {str_extract_all(j, text)}
+  }
+
+```
+
+Quiz questions!
+
+```{r}
+Q1= file.info(fileinfo$files)[4,]
+Q2= fileinfo
+Q3 = c(fileinfo$files[4],textcalculator(fileinfo$files[4],max))
+Q4 = mytokenization(filename,-1)
+```
+
+
+
