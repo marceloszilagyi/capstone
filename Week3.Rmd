@@ -31,8 +31,10 @@ blogs = blogs %>% mutate(linenumber = row_number(), origin = "b")
 news = news %>% mutate(linenumber = row_number(), origin = "n")
 
 # join all tibbles in one big tibble
-corpo = twitter
-rbind(corpo,news,blogs)
+corpo = bind_rows(twitter,news,blogs)
+
+
+
 
 ```
 
@@ -51,6 +53,45 @@ Questions to consider
 
 1) Some words are more frequent than others - what are the distributions of word frequencies?
 ```{r}
+
+# see technical details to see how I got to the 'corpo'
+wordbyword = corpo %>% unnest_tokens(word, value)
+
+# frequency without bad words
+f1 = wordbyword %>% anti_join(badwords, by = "word") %>% count(word, sort = TRUE)
+
+#frequency without stop words
+f2 = f1 %>% anti_join(stop_words, by = "word") 
+
+
+count(word, sort = TRUE)
+
+
+  k <- j %>% as_tibble() %>% unnest_tokens(word, text) %>% 
+            anti_join(stop_words,by = "word") %>% 
+    anti_join(badwords, by = "word")
+  
+  # return the tokenization
+  k %>% count(word, sort = TRUE)
+
+
+
+
+
+  
+  
+
+# removing stop words
+
+
+# removing 
+
+
+
+
+
+
+
 
 ```
 
