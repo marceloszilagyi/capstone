@@ -1,0 +1,100 @@
+---
+title: "Week3"
+author: "Marcelo Szilagyi"
+date: "11/16/2016"
+output: html_document
+---
+
+```{r setup, include = FALSE, echo = FALSE, cache = TRUE, results='hide'}
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(suppressWarnings(
+  sapply(listpackages, function (x) library(x,character.only = T))
+  ))
+```
+
+
+Pre work: join all english datasets in one big corpus of text, but keep one reference
+```{r}
+englishfiles = list.files(recursive = TRUE, pattern = glob2rx('*en_*.txt'))
+filenames = str_extract(englishfiles,"(?<=.)[^.]+(?=.txt)")
+
+for (i in seq_along(englishfiles)) {
+  assign(filenames[i], readLines(con = englishfiles[i],warn = FALSE))
+ }
+
+# create tibbles
+twitter = as_tibble(twitter);blogs = as_tibble(blogs);news = as_tibble(news)
+
+# add row number and origin for future use
+twitter = twitter %>% mutate(linenumber = row_number(), origin = "t")
+blogs = blogs %>% mutate(linenumber = row_number(), origin = "b")
+news = news %>% mutate(linenumber = row_number(), origin = "n")
+
+# join all tibbles in one big tibble
+corpo = twitter
+rbind(corpo,news,blogs)
+
+```
+
+Pre work: remove simbols (but not [Diacritics](https://en.wikipedia.org/wiki/Diacritic )
+```{r}
+
+```
+
+
+## Exploratory Data Analysis
+
+
+Tasks to accomplish
+
+Questions to consider
+
+1) Some words are more frequent than others - what are the distributions of word frequencies?
+```{r}
+
+```
+
+2) What are the frequencies of 2-grams and 3-grams in the dataset?
+```{r}
+
+```
+
+
+3) How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+```{r}
+
+```
+
+4) How do you evaluate how many of the words come from foreign languages?
+```{r}
+
+```
+
+5) Can you think of a way to increase the coverage -- identifying words that may not be in the corpora or using a smaller number of words
+in the dictionary to cover the same number of phrases?
+```{r}
+
+```
+
+
+Exploratory analysis - perform a thorough exploratory analysis of the data, understanding the distribution of words and relationship between the words in the corpora.
+```{r}
+
+```
+
+Understand frequencies of words and word pairs - build figures and tables to understand variation in the frequencies of words and word pairs in the data.
+```{r}
+
+```
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
