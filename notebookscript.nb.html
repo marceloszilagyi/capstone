@@ -224,29 +224,22 @@ badwords = as_tibble(read.csv('badwords.txt')); colnames(badwords) &lt;- &quot;w
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuaiAlPiUgYXNfdGliYmxlKCkgJT4lIHVubmVzdF90b2tlbnMod29yZCwgdGV4dClcblxuYGBgIn0= -->
-<pre class="r"><code>j %&gt;% as_tibble() %&gt;% unnest_tokens(word, text)
-</code></pre>
-<!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiRXJyb3IgaW4gY2hlY2tfaW5wdXQoeCkgOiBcbiAgSW5wdXQgbXVzdCBiZSBhIGNoYXJhY3RlciB2ZWN0b3Igb2YgYW55IGxlbmd0aCBvciBhIGxpc3Qgb2YgY2hhcmFjdGVyXG4gIHZlY3RvcnMsIGVhY2ggb2Ygd2hpY2ggaGFzIGEgbGVuZ3RoIG9mIDEuXG4ifQ== -->
-<pre><code>Error in check_input(x) : 
-  Input must be a character vector of any length or a list of character
-  vectors, each of which has a length of 1.</code></pre>
-<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <p>Write a function with the max, min or avg number of characters in a given file</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYGBge3J9XG5cbmBgYCJ9 -->
-<p><code>r</code>{r}</p>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-output-begin eyJkYXRhIjoiRXJyb3I6IGF0dGVtcHQgdG8gdXNlIHplcm8tbGVuZ3RoIHZhcmlhYmxlIG5hbWVcbiJ9 --&gt;
-</code></pre>
-<p>Error: attempt to use zero-length variable name ```</p>
-<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxudGV4dGNhbGN1bGF0b3IgPC0gZnVuY3Rpb24oZmlsZSwgY2FsY3VsYXRpb25hc3RleHQpIHtcbiAgaj0gcmVhZExpbmVzKGNvbiA9IGZpbGVuYW1lLHdhcm4gPSBGQUxTRSlcbiAgaiA9IGFzLmRhdGEudGFibGUoailcbiAgIGNvbG5hbWVzKGopIDwtIFwidGV4dFxuICBqID0galssIG51bWNoYXIgOj0gbmNoYXIodGV4dCldICN1c2luZyBkYXRhLnRhYmxlIHN5bnRheFxuICAjIGdldCB0aGUgZnVuY3Rpb24gZnJvbSB0aGUgY2hhcmFjdGVyXG4gIGYgPC0gbWF0Y2guZnVuKGNhbGN1bGF0aW9uYXN0ZXh0KVxuICBmKGokbnVtY2hhcilcbn1cbmBgYCJ9 -->
+<pre class="r"><code>textcalculator &lt;- function(file, calculationastext) {
+  j= readLines(con = filename,warn = FALSE)
+  j = as.data.table(j)
+   colnames(j) &lt;- &quot;text
+  j = j[, numchar := nchar(text)] #using data.table syntax
+  # get the function from the character
+  f &lt;- match.fun(calculationastext)
+  f(j$numchar)
+}</code></pre>
+<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <p>Write a function to find a certain text in the file</p>
@@ -270,6 +263,12 @@ badwords = as_tibble(read.csv('badwords.txt')); colnames(badwords) &lt;- &quot;w
 <p>Quiz questions!</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuUTE9IGZpbGUuaW5mbyhmaWxlaW5mbyRmaWxlcylbNCxdXG5RMj0gZmlsZWluZm9cblEzID0gYyhmaWxlaW5mbyRmaWxlc1s0XSx0ZXh0Y2FsY3VsYXRvcihmaWxlaW5mbyRmaWxlc1s0XSxtYXgpKVxuUTQgPSBteXRva2VuaXphdGlvbihmaWxlbmFtZSwtMSlcbmBgYCJ9 -->
+<pre class="r"><code>Q1= file.info(fileinfo$files)[4,]
+Q2= fileinfo
+Q3 = c(fileinfo$files[4],textcalculator(fileinfo$files[4],max))
+Q4 = mytokenization(filename,-1)</code></pre>
+<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
