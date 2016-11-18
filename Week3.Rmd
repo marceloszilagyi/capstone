@@ -5,22 +5,35 @@ date: "11/16/2016"
 output: html_document
 ---
 
+
 ```{r setup, include = FALSE, echo = FALSE, cache = TRUE, results='hide'}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, include=FALSE, cache = TRUE)
+```
+###########
+
+The exploratory data analysis for the english related data provided [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip') starts with preprocessing of the data: the data is uncompressed (unziped), and one large vector is created for each database avaialable - Blogs, Newspapers and Twitter messages. The files are read and converted to a `tibble` - one tipe of `data.frame`. All database are then joined using a package called `tidytext`.
+
+```{r load libraries, warning=FALSE, message=FALSE}
+listpackages = c('data.table', 'tidytext', 'magrittr', 'dplyr', 'dtplyr', 'tibble', 'tm', 'stringr', 'ggplot2','scales','DT', 'tidyr')
 suppressMessages(suppressWarnings(
   sapply(listpackages, function (x) library(x,character.only = T))
   ))
 ```
 
+```{r, get file}
+# get the dataset from web and unzip it
+download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',destfile = "temp")
+unzip('temp')
+file.remove('temp')
+```
 
-Pre work: join all english datasets in one big corpus of text, but keep one reference
-```{r}
+```{r, join all to a corpo}
 englishfiles = list.files(recursive = TRUE, pattern = glob2rx('*en_*.txt'))
 filenames = str_extract(englishfiles,"(?<=.)[^.]+(?=.txt)")
 
+# assign to create the 3 pieces of data
 for (i in seq_along(englishfiles)) {
-  assign(filenames[i], readLines(con = englishfiles[i],warn = FALSE))
- }
+  assign(filenames[i], readLines(con = englishfiles[i],warn = FALSE)) }
 
 # create tibbles
 twitter = as_tibble(twitter);blogs = as_tibble(blogs);news = as_tibble(news)
@@ -33,32 +46,80 @@ news = news %>% mutate(linenumber = row_number(), origin = "n")
 # join all tibbles in one big tibble
 corpo = bind_rows(twitter,news,blogs)
 
-
-
+# create basic stats
+names = c('blogs','news','twitter','corpo')
+lines = c(nrow(blogs),nrow(news),nrow(twitter),nrow(corpo))
 
 ```
+
 
 Pre work: remove simbols (but not [Diacritics](https://en.wikipedia.org/wiki/Diacritic )
 ```{r}
 
 ```
 
+```{r, count words}
 
-## Exploratory Data Analysis
+# Some words are more frequent than others - what are the distributions of word frequencies?
 
 
-Tasks to accomplish
+# take the full corpo and count by origin 
+wordbyword = corpo %>% unnest_tokens(word, value)
+countwords = wordbyword %>% count(origin, word, sort = TRUE) %>% ungroup()
+totalwords = countwords %>% group_by(origin) %>% summarize(total = sum(n))
+countwords = left_join(countwords,totalwords, by = 'origin')  
+words = rbind(totalwords[2],sum(totalwords[2])); colnames(words) = "words"
 
-Questions to consider
+countwordsall = countwords %>% group_by(word) %>% summarize(n = sum(n)) %>% ungroup %>% arrange(desc(n)) %>% mutate (origin = "corpo")
 
-1) Some words are more frequent than others - what are the distributions of word frequencies?
+# get the number of unique words count
+uniquewordscount = bind_rows(countwords %>% group_by(origin) %>% summarize(n_distinct(word)), 
+          countwordsall %>% summarize(n_distinct(word)) %>% mutate (origin="corpo"))
+
+
+# select only the 1st 9000 words
+topninekwords = bind_rows(countwords[,1:3],countwordsall) %>% spread(key=origin, value = n) %>% arrange(desc(corpo)) %>% top_n(n=9000, wt = corpo)
+
+# calculates the cumulative percentage
+topninekwords = topninekwords %>%  mutate(  
+  perc_b = b/as.numeric(filter(totalwords, origin=='b')[2]),
+  perc_t=  t/as.numeric(filter(totalwords, origin=='t')[2]),
+  perc_n = n/as.numeric(filter(totalwords,origin=='n')[2]), 
+  perc_corpo = corpo/as.numeric(sum(totalwords[2])))
+
+topninekwords = topninekwords %>% mutate(cum_perc_b = cumsum(perc_b),
+                          cum_perc_t = cumsum(perc_t),
+                          cum_perc_n =  cumsum(perc_n),
+                          cum_perc_corpo = cumsum(perc_corpo))
+
+
+# prepare the data for the graph
+paretonumberwords = select(topninekwords,starts_with("cum_per")) %>% mutate(number_words = row_number())
+paretonumberwords = gather(paretonumberwords,'origin','cumulative',1:4)
+
+
+```
+
+```{r, create plots}
+# prep for the graph of density- (ideas from <http://tidytextmining.com/tfidf.html>)
+
+originnames = c('t'="Twitter",'b'="Blogs",'n'='News')
+
+plotfrequency = ggplot(countwords, aes(n/total, fill = origin)) +
+  geom_histogram(alpha = 0.8, show.legend = FALSE) +
+  xlim(NA,0.0000035) +
+  labs(title = "Term Frequency Distribution") +
+  facet_wrap(~origin, scales = "free_y",labeller = as_labeller(originnames),nrow = 3)+
+  scale_y_continuous(labels = comma)
+
+plotpareto = ggplot(data=paretonumberwords,aes(x=number_words, y=cumulative, color=origin)) + geom_point(shape=1) + scale_x_continuous(trans = 'log10')
+
+```
+
 ```{r}
 
-# see technical details to see how I got to the 'corpo'
-wordbyword = corpo %>% unnest_tokens(word, value)
-
 # frequency without bad words
-f1 = wordbyword %>% anti_join(badwords, by = "word") %>% count(word, sort = TRUE)
+f1 = wordbyword %>% anti_join(badwords, by = "word") %>% count(word, sort = TRUE) 
 
 #frequency without stop words
 f2 = f1 %>% anti_join(stop_words, by = "word") 
@@ -74,19 +135,28 @@ count(word, sort = TRUE)
   # return the tokenization
   k %>% count(word, sort = TRUE)
 
-
+```
 
 
 
   
-  
+####################################################################
 
-# removing stop words
+# Exploratory Data Analysis for the Data Science Capstone Project
+
+The exploratory data analysis for the english related data provided [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip') starts with preprocessing of the data: the data is uncompressed (unziped), and one large vector is created for each database avaialable - Blogs, Newspapers and Twitter messages. The files are read and converted to a `tibble` - one tipe of `data.frame`. All database are then joined using a package called `tidytext`.
+
+Here are some of the basic information about the databases. In general, the consolidated database has more than the estimated [500,000 words in English] <http://www.slate.com/articles/life/the_good_word/2006/04/word_count.html>
+
+```{r, echo = FALSE, cache = TRUE, results= 'asis'}
+datatable(cbind.data.frame(names,lines,words,unique_words = uniquewordscount[,2]),colnames = c('Database','Lines','Words','Unique Words')) %>% formatCurrency(c('lines','words','n_distinct(word)'),currency = "",digits = 0)
+```
 
 
-# removing 
-
-
+The plots for all the databases show a similar result - most of the words are lightly used, while some words are recurrently used. 
+```{r, echo = FALSE, cache = TRUE, results= 'asis', warning= FALSE, message=FALSE}
+plotfrequency
+```
 
 
 
@@ -102,7 +172,9 @@ count(word, sort = TRUE)
 
 
 3) How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+As it is possible to see
 ```{r}
+plotpareto
 
 ```
 
