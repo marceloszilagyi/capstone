@@ -22,9 +22,9 @@ suppressMessages(suppressWarnings(
 
 ```{r, get file}
 # get the dataset from web and unzip it
-download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',destfile = "temp")
-unzip('temp')
-file.remove('temp')
+#download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',destfile = "temp")
+#unzip('temp')
+#file.remove('temp')
 ```
 
 ```{r, join all to a corpo}
@@ -67,7 +67,12 @@ Pre work: remove simbols (but not [Diacritics](https://en.wikipedia.org/wiki/Dia
 wordbyword = corpo %>% unnest_tokens(word, value)
 countwords = wordbyword %>% count(origin, word, sort = TRUE) %>% ungroup()
 totalwords = countwords %>% group_by(origin) %>% summarize(total = sum(n))
-countwords = left_join(countwords,totalwords, by = 'origin')  
+countwords = left_join(countwords,totalwords, by = 'origin')
+countwords = countwords %>% group_by(origin) %>% mutate(cumulative = cumsum(n/total), count = dense_rank(desc(n))) %>% ungroup()
+
+
+
+
 words = rbind(totalwords[2],sum(totalwords[2])); colnames(words) = "words"
 
 countwordsall = countwords %>% group_by(word) %>% summarize(n = sum(n)) %>% ungroup %>% arrange(desc(n)) %>% mutate (origin = "corpo")
@@ -114,6 +119,33 @@ plotfrequency = ggplot(countwords, aes(n/total, fill = origin)) +
 
 plotpareto = ggplot(data=paretonumberwords,aes(x=number_words, y=cumulative, color=origin)) + geom_point(shape=1) + scale_x_continuous(trans = 'log10')
 
+temp = countwords %>% filter(cumulative<0.95) %>% mutate(origin = ifelse(origin =='t',"Twitter", ifelse(origin =='b',"Blog","News")))
+
+midinfo = temp %>% filter(round(cumulative,2)==(0.50)) %>% select(c(origin,cumulative,count)) %>% group_by(origin)%>% ungroup() %>% filter(count==max(count)|count==min(count)) %>% group_by(origin) %>% filter(cumulative==max(cumulative))
+
+parinfo = temp %>% filter(round(cumulative,2)==(0.80)) %>% select(c(origin,cumulative,count)) %>% group_by(origin)%>% ungroup() %>% filter(count==max(count)|count==min(count)) %>% group_by(origin) %>% filter(cumulative==max(cumulative))
+
+almostallinfo = temp %>% filter(round(cumulative,2)==(0.950)) %>% select(c(origin,cumulative,count)) %>% group_by(origin)%>% ungroup() %>% filter(count==max(count)|count==min(count)) %>% group_by(origin) %>% filter(cumulative==max(cumulative))
+
+
+a = ggplot(data= temp ,aes(x=count, y=cumulative, color=origin)) + geom_point(shape=1) + 
+  scale_x_continuous(trans = 'log10', breaks =c( 10,100,300,500,1000,3000,10000))  + 
+  scale_y_continuous(breaks = seq(0.05,0.95, by= 0.1), labels = percent) + 
+  labs (title  = "Words neeeded to all word instances") + 
+  ylab ("Word instance %") + xlab("Number of words") 
+
+a = a +  annotate("rect", xmin = midinfo$count[1], xmax = midinfo$count[2], ymin = 0.475, ymax = 0.525, alpha = .2)  
+a = a +  annotate("text", x= midinfo$count[1], y=midinfo$cumulative[1], label=paste0(as.character(midinfo[1,1])," ",as.character(midinfo[1,3])," words \n",as.character(midinfo[2,1]),"",as.character(midinfo[2,3])," words "))
+
+a = a +  annotate("rect", xmin = parinfo$count[1], xmax = parinfo$count[2], ymin = 0.775, ymax = 0.825, alpha = .2)  
+a = a +  annotate("text", x= parinfo$count[1], y=parinfo$cumulative[1], label=paste0(as.character(parinfo[1,1])," ",as.character(parinfo[1,3])," words \n",as.character(parinfo[2,1])," ",as.character(parinfo[2,3])," words "))
+
+a = a +  annotate("rect", xmin = almostallinfo$count[1], xmax = almostallinfo$count[2], ymin = 0.925, ymax = 0.975, alpha = .2)  
+a = a +  annotate("text", x= almostallinfo$count[1], y=almostallinfo$cumulative[1], label=paste0(as.character(almostallinfo[1,1]),"  ",as.character(almostallinfo[1,3])," words \n ",as.character(almostallinfo[2,1])," ",as.character(almostallinfo[2,3])," words "))
+
+a
+
+
 ```
 
 ```{r}
@@ -153,13 +185,16 @@ datatable(cbind.data.frame(names,lines,words,unique_words = uniquewordscount[,2]
 ```
 
 
-The plots for all the databases show a similar result - most of the words are lightly used, while some words are recurrently used. 
+The plots for all the databases show a similar result - most of the words are lightly used, while some words are recurrently used.  
 ```{r, echo = FALSE, cache = TRUE, results= 'asis', warning= FALSE, message=FALSE}
 plotfrequency
 ```
 
+A lot of "words" with only one frequency are just non English characthers, for example: 
 
+```{r pending }
 
+```
 
 
 
