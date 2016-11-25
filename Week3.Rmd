@@ -14,20 +14,28 @@ knitr::opts_chunk$set(echo = TRUE, include=FALSE, cache = TRUE)
 The exploratory data analysis for the english related data provided [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip') starts with preprocessing of the data: the data is uncompressed (unziped), and one large vector is created for each database avaialable - Blogs, Newspapers and Twitter messages. The files are read and converted to a `tibble` - one tipe of `data.frame`. All database are then joined using a package called `tidytext`.
 
 ```{r load libraries, warning=FALSE, message=FALSE}
-listpackages = c('data.table', 'tidytext', 'magrittr', 'dplyr', 'dtplyr', 'tibble', 'tm', 'stringr', 'ggplot2','scales','DT', 'tidyr')
-suppressMessages(suppressWarnings(
+listpackages = c('data.table', 'tidytext', 'magrittr', 'dplyr', 'dtplyr', 'tibble', 'tm', 'stringr', 'ggplot2','scales','DT', 'tidyr', 'igraph','magrittr','gridExtra','readr')
+loaded = suppressMessages(suppressWarnings(
   sapply(listpackages, function (x) library(x,character.only = T))
   ))
+
+#devtools::install_github('hadley/ggplot2')
+#devtools::install_github('thomasp85/ggforce')
+#devtools::install_github('thomasp85/ggraph')
+#devtools::install_github('slowkow/ggrepel')
+
+
+rm(loaded)
 ```
 
-```{r, get file}
+```{r get_file}
 # get the dataset from web and unzip it
 #download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',destfile = "temp")
 #unzip('temp')
 #file.remove('temp')
 ```
 
-```{r, join all to a corpo}
+```{r join_all_to_a_corpo}
 englishfiles = list.files(recursive = TRUE, pattern = glob2rx('*en_*.txt'))
 filenames = str_extract(englishfiles,"(?<=.)[^.]+(?=.txt)")
 
@@ -46,6 +54,7 @@ news = news %>% mutate(linenumber = row_number(), origin = "n")
 # join all tibbles in one big tibble
 corpo = bind_rows(twitter,news,blogs)
 
+
 # create basic stats
 names = c('blogs','news','twitter','corpo')
 lines = c(nrow(blogs),nrow(news),nrow(twitter),nrow(corpo))
@@ -53,15 +62,10 @@ lines = c(nrow(blogs),nrow(news),nrow(twitter),nrow(corpo))
 ```
 
 
-Pre work: remove simbols (but not [Diacritics](https://en.wikipedia.org/wiki/Diacritic )
-```{r}
-
-```
-
-```{r, count words}
+```{r count_words}
 
 # Some words are more frequent than others - what are the distributions of word frequencies?
-
+# from this 
 
 # take the full corpo and count by origin 
 wordbyword = corpo %>% unnest_tokens(word, value)
@@ -69,43 +73,31 @@ countwords = wordbyword %>% count(origin, word, sort = TRUE) %>% ungroup()
 totalwords = countwords %>% group_by(origin) %>% summarize(total = sum(n))
 countwords = left_join(countwords,totalwords, by = 'origin')
 countwords = countwords %>% group_by(origin) %>% mutate(cumulative = cumsum(n/total), count = dense_rank(desc(n))) %>% ungroup()
-
-
-
-
 words = rbind(totalwords[2],sum(totalwords[2])); colnames(words) = "words"
 
-countwordsall = countwords %>% group_by(word) %>% summarize(n = sum(n)) %>% ungroup %>% arrange(desc(n)) %>% mutate (origin = "corpo")
+# this is temp database only to show 
+temp = countwords %>% filter(cumulative<0.95) %>% mutate(origin = ifelse(origin =='t',"Twitter", ifelse(origin =='b',"Blog","News")))
 
-# get the number of unique words count
-uniquewordscount = bind_rows(countwords %>% group_by(origin) %>% summarize(n_distinct(word)), 
-          countwordsall %>% summarize(n_distinct(word)) %>% mutate (origin="corpo"))
+midinfo = temp %>% filter(round(cumulative,2)==(0.50)) %>% select(c(origin,cumulative,count)) %>% group_by(origin)%>% ungroup() %>% filter(count==max(count)|count==min(count)) %>% group_by(origin) %>% filter(cumulative==max(cumulative))
 
+parinfo = temp %>% filter(round(cumulative,2)==(0.80)) %>% select(c(origin,cumulative,count)) %>% group_by(origin)%>% ungroup() %>% filter(count==max(count)|count==min(count)) %>% group_by(origin) %>% filter(cumulative==max(cumulative))
 
-# select only the 1st 9000 words
-topninekwords = bind_rows(countwords[,1:3],countwordsall) %>% spread(key=origin, value = n) %>% arrange(desc(corpo)) %>% top_n(n=9000, wt = corpo)
+almostallinfo = temp %>% filter(round(cumulative,2)==(0.950)) %>% select(c(origin,cumulative,count)) %>% group_by(origin)%>% ungroup() %>% filter(count==max(count)|count==min(count)) %>% group_by(origin) %>% filter(cumulative==max(cumulative))
 
-# calculates the cumulative percentage
-topninekwords = topninekwords %>%  mutate(  
-  perc_b = b/as.numeric(filter(totalwords, origin=='b')[2]),
-  perc_t=  t/as.numeric(filter(totalwords, origin=='t')[2]),
-  perc_n = n/as.numeric(filter(totalwords,origin=='n')[2]), 
-  perc_corpo = corpo/as.numeric(sum(totalwords[2])))
+# 100 top words 
+bestwords = temp %>% group_by(word) %>% summarize(n2 = sum(n), total2 = sum(total), per2 = cumsum(n2/total2)) %>% ungroup() %>% arrange(desc(per2)) %>% filter(row_number()<101) %>% select(word) %>% mutate(rank = cut(row_number(),breaks = 10,labels = FALSE))
 
-topninekwords = topninekwords %>% mutate(cum_perc_b = cumsum(perc_b),
-                          cum_perc_t = cumsum(perc_t),
-                          cum_perc_n =  cumsum(perc_n),
-                          cum_perc_corpo = cumsum(perc_corpo))
+first20 = bestwords[1:20,1]; colnames(first20) <- "1st to 20th"
+`21_to_40` = bestwords[21:40,1]; colnames(`21_to_40`) <-  "21st to 40th"
+`41_to_60` = bestwords[41:60,1]; colnames(`41_to_60`) <-  "41st to 60th"
+`61_to_60` = bestwords[61:80,1]; colnames(`61_to_80`) <-  "61st to 80th"
+`81_to_100` = bestwords[81:100,1]; colnames(`81_to_100`) <-  "80th to 100th"
 
-
-# prepare the data for the graph
-paretonumberwords = select(topninekwords,starts_with("cum_per")) %>% mutate(number_words = row_number())
-paretonumberwords = gather(paretonumberwords,'origin','cumulative',1:4)
-
-
+printbestwords = datatable(cbind(first20,`21_to_40`,`41_to_60`,`61_to_80`,`81_to_100` ),autoHideNavigation = TRUE,rownames = FALSE)
+uniquewordscount = countwords %>% group_by(origin) %>% summarize(n_distinct(word))  
 ```
 
-```{r, create plots}
+```{r create_plots_for_count_words }
 # prep for the graph of density- (ideas from <http://tidytextmining.com/tfidf.html>)
 
 originnames = c('t'="Twitter",'b'="Blogs",'n'='News')
@@ -115,38 +107,171 @@ plotfrequency = ggplot(countwords, aes(n/total, fill = origin)) +
   xlim(NA,0.0000035) +
   labs(title = "Term Frequency Distribution") +
   facet_wrap(~origin, scales = "free_y",labeller = as_labeller(originnames),nrow = 3)+
-  scale_y_continuous(labels = comma)
-
-plotpareto = ggplot(data=paretonumberwords,aes(x=number_words, y=cumulative, color=origin)) + geom_point(shape=1) + scale_x_continuous(trans = 'log10')
-
-temp = countwords %>% filter(cumulative<0.95) %>% mutate(origin = ifelse(origin =='t',"Twitter", ifelse(origin =='b',"Blog","News")))
-
-midinfo = temp %>% filter(round(cumulative,2)==(0.50)) %>% select(c(origin,cumulative,count)) %>% group_by(origin)%>% ungroup() %>% filter(count==max(count)|count==min(count)) %>% group_by(origin) %>% filter(cumulative==max(cumulative))
-
-parinfo = temp %>% filter(round(cumulative,2)==(0.80)) %>% select(c(origin,cumulative,count)) %>% group_by(origin)%>% ungroup() %>% filter(count==max(count)|count==min(count)) %>% group_by(origin) %>% filter(cumulative==max(cumulative))
-
-almostallinfo = temp %>% filter(round(cumulative,2)==(0.950)) %>% select(c(origin,cumulative,count)) %>% group_by(origin)%>% ungroup() %>% filter(count==max(count)|count==min(count)) %>% group_by(origin) %>% filter(cumulative==max(cumulative))
-
+  scale_y_continuous(labels = comma) +
+  expand_limits(x = 0, y = 0)
 
 a = ggplot(data= temp ,aes(x=count, y=cumulative, color=origin)) + geom_point(shape=1) + 
   scale_x_continuous(trans = 'log10', breaks =c( 10,100,300,500,1000,3000,10000))  + 
   scale_y_continuous(breaks = seq(0.05,0.95, by= 0.1), labels = percent) + 
   labs (title  = "Words neeeded to all word instances") + 
-  ylab ("Word instance %") + xlab("Number of words") 
+  ylab ("Word instance %") + 
+  xlab("Number of words") +
+  theme(legend.position="bottom")
 
+# annotation to display the number of words
 a = a +  annotate("rect", xmin = midinfo$count[1], xmax = midinfo$count[2], ymin = 0.475, ymax = 0.525, alpha = .2)  
-a = a +  annotate("text", x= midinfo$count[1], y=midinfo$cumulative[1], label=paste0(as.character(midinfo[1,1])," ",as.character(midinfo[1,3])," words \n",as.character(midinfo[2,1]),"",as.character(midinfo[2,3])," words "))
+a = a +  annotate("text", x= midinfo$count[1], y=midinfo$cumulative[1], label=paste0(as.character(midinfo[1,1])," ",as.character(midinfo[1,3])," words \n",as.character(midinfo[2,1])," ",as.character(midinfo[2,3])," words "),size =3)
 
 a = a +  annotate("rect", xmin = parinfo$count[1], xmax = parinfo$count[2], ymin = 0.775, ymax = 0.825, alpha = .2)  
-a = a +  annotate("text", x= parinfo$count[1], y=parinfo$cumulative[1], label=paste0(as.character(parinfo[1,1])," ",as.character(parinfo[1,3])," words \n",as.character(parinfo[2,1])," ",as.character(parinfo[2,3])," words "))
+a = a +  annotate("text", x= parinfo$count[1], y=parinfo$cumulative[1], label=paste0(as.character(parinfo[1,1])," ",as.character(parinfo[1,3])," words \n",as.character(parinfo[2,1])," ",as.character(parinfo[2,3])," words "), size =3)
 
 a = a +  annotate("rect", xmin = almostallinfo$count[1], xmax = almostallinfo$count[2], ymin = 0.925, ymax = 0.975, alpha = .2)  
-a = a +  annotate("text", x= almostallinfo$count[1], y=almostallinfo$cumulative[1], label=paste0(as.character(almostallinfo[1,1]),"  ",as.character(almostallinfo[1,3])," words \n ",as.character(almostallinfo[2,1])," ",as.character(almostallinfo[2,3])," words "))
+a = a +  annotate("text", x= almostallinfo$count[1]-1000, y=almostallinfo$cumulative[1], label=paste0(as.character(almostallinfo[1,1]),"  ",as.character(almostallinfo[1,3])," words \n ",as.character(almostallinfo[2,1])," ",as.character(almostallinfo[2,3])," words "),size =3)
 
-a
+```
+
+
+```{r 2ngrams}
+
+# need to reduce the size of the database - I reduced to 10% of the size
+corpo1 = corpo %>% group_by(origin) %>% sample_frac(0.1) %>% ungroup()
+
+bigram = corpo1 %>% unnest_tokens(bigram,value,token = "ngrams", n=2)
+splitwords = as_tibble(str_split(bigram$bigram," ",simplify = TRUE))
+bigram  = bind_cols(bigram, splitwords) %>% rename(word1 = V1, word2 = V2)
+
+# basic counting
+countingbigrams = count(bigram,bigram,word1,word2,sort=TRUE)
+
+# some easy graphic from <http://tidytextmining.com/ngrams.html>
+bigram_graph <- countingbigrams  %>% ungroup() %>% select(word1,word2,n) %>%
+  top_n (n= 100, wt = n) %>%
+  graph_from_data_frame()
+
+maintwo = "Bigrams"
+subtwo = paste("relationship of the top","bigrams" )
+
+# frequency
+total = sum(countingbigrams$n)
+countingbigrams = countingbigrams %>% ungroup() %>% mutate(cumulative = cumsum(n/total))
+
+#pareto graph
+temp <- countingbigrams %>% mutate(number_bigrams  = row_number(cumulative)) %>% select(number_bigrams,cumulative) %>% filter(number_bigrams %in% c(2^(0:20)))
+
+modelbi <- loess(cumulative ~ number_bigrams, data = temp)
+
+bigraph  = ggplot(data=temp ,aes(x=number_bigrams, y=cumulative)) + geom_point(shape=1)
+bigraph  = bigraph  +  scale_y_continuous(breaks = seq(0.0,1, by= 0.1), labels = percent) + 
+  labs (title  = "Bigrams cumulative frequency") + 
+  ylab ("Cumulative instance %") + 
+  xlab("Number of Bigrams") +
+  theme(legend.position="bottom")+
+  scale_x_continuous(trans = 'log2',labels = comma, breaks = 4^(0:10) )+
+  stat_smooth(method = "loess")
 
 
 ```
+
+```{r 3ngrams}
+
+# 3 grams
+trigram = corpo1 %>% unnest_tokens(trigram ,value,token = "ngrams", n=3)
+trisplitwords = as_tibble(str_split(trigram$trigram," ",simplify = TRUE))
+trigram  = bind_cols(trigram, trisplitwords) %>% rename(word1 = V1, word2 = V2, word3 = V3)
+
+# basic counting
+countingtrigrams = count(trigram, trigram, word1, word2, word3, sort=TRUE)
+
+# graph
+trigram_graph <- countingtrigrams %>% ungroup() %>% select(word1,word2, word3, n) %>% 
+  top_n (n= 60, wt = n) %>%
+  graph_from_data_frame()
+maintree = "Trigrams"
+subtree = paste("relationship of the top", "trigrams" )
+
+# frequency
+total = sum(countingtrigrams$n)
+countingtrigrams = countingtrigrams %>% ungroup() %>% mutate(cumulative = cumsum(n/total))
+
+#pareto graph
+temp2 <- countingtrigrams %>% mutate(number_trigrams  = row_number(cumulative)) %>% select(number_trigrams,cumulative) %>% filter(number_trigrams %in% c(2^(0:20)))
+
+trigraph  = ggplot(data=temp2 ,aes(x=number_trigrams, y=cumulative)) + geom_point(shape=1)
+trigraph  = trigraph  +  scale_y_continuous(breaks = seq(0.0,1, by= 0.1), labels = percent) + 
+  labs (title  = "Trigrams cumulative frequency") + 
+  ylab ("Cumulative instance %") + 
+  xlab("Number of Trigrams") +
+  theme(legend.position="bottom")+
+  scale_x_continuous(trans = 'log2',labels = comma, breaks = 4^(0:10) )+
+  stat_smooth(method = "loess")
+
+```
+
+
+
+```{r countingnonenglish}
+wordcountcorpo1 = corpo1 %>% unnest_tokens(word ,value) %>% count(word, sort = TRUE) %>% ungroup()                  
+
+#get the english dictionary
+download.file('https://raw.githubusercontent.com/dwyl/english-words/master/words3.txt',destfile = "dictionary.txt")
+dictionary = read_csv("dictionary.txt",col_names = "word")
+dictionary  = dictionary %>% mutate(dictionary="dictionary")
+
+# example of strategies
+# subset  non dictionary words to further analysis
+ nonenglish <- wordcountcorpo1 %>% anti_join(dictionary,by = "word") %>% ungroup() %>% count(word, sort = TRUE)
+
+# a lot of 'non english words' are in just just ''s' to (possessive)
+ # only numbers
+ grep(nonenglish$word,pattern = "[^0-9A-Z\',.-]
+ 
+grep("[`’‘]",nonenglish$word,value = TRUE) %>% grep(pattern = "\\W", value = TRUE) 
+     
+     
+
+
+
+
+
+
+#using negative join, get the non-english 
+# remove 's from the database
+ nonenglish <- wordcountcorpo1 %>% anti_join(dictionary,by = "word") %>% ungroup() %>% count(word, sort = TRUE)
+
+# create a play df just for display purposes 
+   play = sample_n(wordcountcorpo1,10000)
+   
+   grep(play$word, pattern = "[^a-z0-9A-Z\',.-]", value = TRUE, invert = TRUE)
+    grep(play$word, pattern = "['`’‘]", value = TRUE)
+   
+
+  simbolnonenglish = grep("[[:punct:]]", nonenglish$word, value = TRUE)
+
+# play with regex
+  # objective - learn how to correct cases with 's
+  
+  # objective - learn how to identify only non word chars
+  
+  #objective - learn how to identify foreign charaters 
+  grep(play$word, pattern = "[^a-z0-9A-Z\',.-]", value = TRUE)
+  
+  # objective - learn how to identify words with only foreign chars 
+  
+
+  
+  grep("[[:punct:]]", nonenglish$word, value = TRUE)
+  
+  
+  
+c(nrow(wordcountcorpo1), nrow(dictionary), nrow(nonenglish))
+
+```
+
+
+
+
+
+
 
 ```{r}
 
@@ -176,19 +301,33 @@ count(word, sort = TRUE)
 
 # Exploratory Data Analysis for the Data Science Capstone Project
 
-The exploratory data analysis for the english related data provided [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip') starts with preprocessing of the data: the data is uncompressed (unziped), and one large vector is created for each database avaialable - Blogs, Newspapers and Twitter messages. The files are read and converted to a `tibble` - one tipe of `data.frame`. All database are then joined using a package called `tidytext`.
+The exploratory data analysis for the english related data provided [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip) starts with preprocessing of the data: the data is uncompressed (unziped), and one large vector is created for each database avaialable - Blogs, Newspapers and Twitter messages. The files are read and converted to a `tibble` - one tipe of `data.frame`. All databases are then joined using a package called `tidytext`. To reduce processing of this document, a 'tidy' corpora (one word per line) was created and is avaiable at [TODO].
 
-Here are some of the basic information about the databases. In general, the consolidated database has more than the estimated [500,000 words in English] <http://www.slate.com/articles/life/the_good_word/2006/04/word_count.html>
+Here are some of the basic information about the databases. In general, the consolidated database has more than the estimated [500,000 words in English] (http://www.slate.com/articles/life/the_good_word/2006/04/word_count.html)
 
-```{r, echo = FALSE, cache = TRUE, results= 'asis'}
+```{r, echo = FALSE, results='markup'}
 datatable(cbind.data.frame(names,lines,words,unique_words = uniquewordscount[,2]),colnames = c('Database','Lines','Words','Unique Words')) %>% formatCurrency(c('lines','words','n_distinct(word)'),currency = "",digits = 0)
 ```
 
-
 The plots for all the databases show a similar result - most of the words are lightly used, while some words are recurrently used.  
-```{r, echo = FALSE, cache = TRUE, results= 'asis', warning= FALSE, message=FALSE}
+```{r, echo = FALSE, cache = TRUE, results= 'markup', warning= FALSE, message=FALSE}
 plotfrequency
 ```
+
+As it is possible to see on the graph below, the 3 databases have the same trend in terms of coverage - a small number of words are responsible for a large covergate of instances. 
+For example, 50% of instances are covered by 110 words in the blog, while 228 words in the news database. Only 1417 words cover 80% of all instances in Twitter, while 2357 words are required for news. 
+This demonstrates that though the trend is the same - a small number of words cover a large part of instances - the 'news' database requires more words to get to the same coverage. One reason could be type of content  - news are potentially more complex than twitter messages.
+
+```{r graph all word instances, results='markup'}
+a
+```
+
+The top 100 words for all consolidated databases are displayed below - masculine and feminine pronoums have very distinct frequencies: 
+
+```{r, results='markup'}
+printbestwords
+```
+
 
 A lot of "words" with only one frequency are just non English characthers, for example: 
 
@@ -197,23 +336,40 @@ A lot of "words" with only one frequency are just non English characthers, for e
 ```
 
 
-
 ```
 
 2) What are the frequencies of 2-grams and 3-grams in the dataset?
-```{r}
 
+Using the package 'tidytext', 2 and 3 grams were created, using a sample of 10% of all the databases. This sample shows the that 64 bigrams account for aprox. 5% of all bigrams instances. As words are combined, the factorial growth of potential can be noted - 256 bigrams are required to reach 10% of the coverage (4 times more word only doubling the coverage). More than 1024 bigrams are required to cover 20%, while to reach 40%, more than 16 thousand bigrams are required (16 times the number of bigrams to double the coverage from 20% to 40%). 
+Trigrams, on their turn, show a similar trend, but with a smaller coverage. 256 trigrams do not reach 2.5% of instances, and 16 thousand combinations reach only 11% of the coverage (compared to 40% of bigrams)
+
+The graph below displays the cumulative frequency of bigrams and trigrams: 
+
+```{r, results='asis', echo=FALSE}
+ library(gridExtra)
+ grid.arrange(bigraph, trigraph, ncol=2)
 ```
 
+It is possible to arrange bigrams and trigrams in network of words, as shown below. By looking the Bigram and Trigram network of more frequent words and the arrows, it is possible to see the usual relationship between words and expansions to n-grams of 4 and 5 workds, for example:
+ - 'I'm going to be able'
+ - 'this is going to be'
+ - 'thanks for the best'
+ - 'I will be a great'
 
-3) How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
-As it is possible to see
-```{r}
-plotpareto
+A future model can explore those relantionships and organize words by their proximity  
 
+```{r bigramplot}
+plot(bigram_graph , vertex.size=13, edge.arrow.size=0.2, main=maintwo, sub = subtwo)
 ```
+
+```{r trigramplot}
+plot(trigram_graph, vertex.size=13, edge.arrow.size=0.2, main=maintree, sub = subtree)
+```
+
 
 4) How do you evaluate how many of the words come from foreign languages?
+It is possible to evaluate the words coming from foreing language by matching the existing database of words against a list of [english words](https://github.com/dwyl/english-words/blob/master/words.txt) or eliminate  words that are only composed by special characters. Based on a sample of 10% of the total 
+
 ```{r}
 
 ```
@@ -224,25 +380,3 @@ in the dictionary to cover the same number of phrases?
 
 ```
 
-
-Exploratory analysis - perform a thorough exploratory analysis of the data, understanding the distribution of words and relationship between the words in the corpora.
-```{r}
-
-```
-
-Understand frequencies of words and word pairs - build figures and tables to understand variation in the frequencies of words and word pairs in the data.
-```{r}
-
-```
-
-
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
