@@ -1,15 +1,15 @@
 ---
-title: "Week3"
+title: "Milestone Report/Capstone Project"
 author: "Marcelo Szilagyi"
 date: "11/16/2016"
 output: html_document
 ---
 
-```{r setup, include = FALSE, echo = FALSE, cache = TRUE, results='hide'}
+```{r setup, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE}
 knitr::opts_chunk$set(echo = TRUE, include=FALSE, cache = TRUE)
 ```
 
-```{r load libraries, warning=FALSE, message=FALSE}
+```{r load libraries, warning=FALSE, message=FALSE, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE}
 listpackages = c('data.table', 'tidytext', 'magrittr', 'dplyr', 'dtplyr', 'tibble', 'tm', 'stringr', 'ggplot2','scales','DT', 'tidyr', 'igraph','magrittr','gridExtra','readr')
 loaded = suppressMessages(suppressWarnings(
   sapply(listpackages, function (x) library(x,character.only = T))
@@ -24,15 +24,18 @@ loaded = suppressMessages(suppressWarnings(
 rm(loaded)
 ```
 
-```{r get_file}
-# get the dataset from web and unzip it
-#download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',destfile = "temp")
-#unzip('temp')
-#file.remove('temp')
+```{r get_file, warning=FALSE, message=FALSE, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE}
+englishfiles = list.files(recursive = TRUE, pattern = glob2rx('*en_*.txt'))
+
+if(length(englishfiles)==0) { 
+       # get the dataset from web and unzip it
+       download.file('https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip',destfile = "temp")
+       unzip('temp')
+       file.remove('temp')}
 ```
 
-```{r join_all_to_a_corpo}
-englishfiles = list.files(recursive = TRUE, pattern = glob2rx('*en_*.txt'))
+```{r join_all_to_a_corpo, warning=FALSE, message=FALSE, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE}
+
 filenames = str_extract(englishfiles,"(?<=.)[^.]+(?=.txt)")
 
 # assign to create the 3 pieces of data
@@ -43,9 +46,9 @@ for (i in seq_along(englishfiles)) {
 twitter = as_tibble(twitter);blogs = as_tibble(blogs);news = as_tibble(news)
 
 # add row number and origin for future use
-twitter = twitter %>% mutate(linenumber = row_number(), origin = "t")
-blogs = blogs %>% mutate(linenumber = row_number(), origin = "b")
-news = news %>% mutate(linenumber = row_number(), origin = "n")
+twitter = twitter %>% mutate(linenumber = row_number(), origin = "t") %>% sample_frac(size=0.1) 
+blogs = blogs %>% mutate(linenumber = row_number(), origin = "b") %>% sample_frac(size=0.1)
+news = news %>% mutate(linenumber = row_number(), origin = "n") %>% sample_frac(size=0.1) 
 
 # join all tibbles in one big tibble
 corpo = bind_rows(twitter,news,blogs)
@@ -60,7 +63,7 @@ rm(news)
 
 ```
 
-```{r count_words}
+```{r count_words, warning=FALSE, message=FALSE, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE}
 
 # Some words are more frequent than others - what are the distributions of word frequencies?
 # from this 
@@ -93,9 +96,12 @@ first20 = bestwords[1:20,1]; colnames(first20) <- "1st to 20th"
 
 printbestwords = datatable(cbind(first20,`21_to_40`,`41_to_60`,`61_to_80`,`81_to_100` ),autoHideNavigation = TRUE,rownames = FALSE)
 uniquewordscount = countwords %>% group_by(origin) %>% summarize(n_distinct(word))  
+test = countwords %>% ungroup() %>% summarize(n_distinct(word)) %>% mutate (origin = "total")
+uniquewordscount = full_join(test,uniquewordscount) %>% arrange(origin) %>% select(origin, `n_distinct(word)`)
+
 ```
 
-```{r create_plots_for_count_words }
+```{r create_plots_for_count_words, warning=FALSE, message=FALSE, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE, fig.height=7,fig.height=7 }
 # prep for the graph of density- (ideas from <http://tidytextmining.com/tfidf.html>)
 
 originnames = c('t'="Twitter",'b'="Blogs",'n'='News')
@@ -110,7 +116,7 @@ plotfrequency = ggplot(countwords, aes(n/total, fill = origin)) +
 
 a = ggplot(data= temp ,aes(x=count, y=cumulative, color=origin)) + geom_point(shape=1) + 
   scale_x_continuous(trans = 'log10', breaks =c( 10,100,300,500,1000,3000,10000))  + 
-  scale_y_continuous(breaks = seq(0.05,0.95, by= 0.1), labels = percent) + 
+  scale_y_continuous(breaks = seq(0.05,1.05, by= 0.1), labels = percent) + 
   labs (title  = "Words neeeded to all word instances") + 
   ylab ("Word instance %") + 
   xlab("Number of words") +
@@ -124,16 +130,15 @@ a = a +  annotate("rect", xmin = parinfo$count[1], xmax = parinfo$count[2], ymin
 a = a +  annotate("text", x= parinfo$count[1], y=parinfo$cumulative[1], label=paste0(as.character(parinfo[1,1])," ",as.character(parinfo[1,3])," words \n",as.character(parinfo[2,1])," ",as.character(parinfo[2,3])," words "), size =3)
 
 a = a +  annotate("rect", xmin = almostallinfo$count[1], xmax = almostallinfo$count[2], ymin = 0.925, ymax = 0.975, alpha = .2)  
-a = a +  annotate("text", x= almostallinfo$count[1]-1000, y=almostallinfo$cumulative[1], label=paste0(as.character(almostallinfo[1,1]),"  ",as.character(almostallinfo[1,3])," words \n ",as.character(almostallinfo[2,1])," ",as.character(almostallinfo[2,3])," words "),size =3)
+a = a +  annotate("text", x= almostallinfo$count[1], y=almostallinfo$cumulative[1], label=paste0(as.character(almostallinfo[1,1]),"  ",as.character(almostallinfo[1,3])," words \n ",as.character(almostallinfo[2,1])," ",as.character(almostallinfo[2,3])," words "),size =3)
 
 ```
 
-```{r 2ngrams}
+```{r 2ngrams, warning=FALSE, message=FALSE, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE}
 
-# need to reduce the size of the database - I reduced to 10% of the size
-ifelse(nrow(corpo)>1e+6, 
-       corpo1 = corpo %>% group_by(origin) %>% sample_frac(0.1) %>% ungroup(),
-       corpo1 = corpo)
+# need to reduce the size of the database - I reduced to 120k lines
+ corpo1 <- corpo %>% group_by(origin) %>% sample_n(40000) %>% ungroup()
+
 
 bigram = corpo1 %>% unnest_tokens(bigram,value,token = "ngrams", n=2)
 splitwords = as_tibble(str_split(bigram$bigram," ",simplify = TRUE))
@@ -167,12 +172,13 @@ bigraph  = bigraph  +  scale_y_continuous(breaks = seq(0.0,1, by= 0.1), labels =
   xlab("Number of Bigrams") +
   theme(legend.position="bottom")+
   scale_x_continuous(trans = 'log2',labels = comma, breaks = 4^(0:10) )+
-  stat_smooth(method = "loess")
+  stat_smooth(method = "loess")+
+  theme(axis.text.x = element_text(angle=90, hjust=1)) 
 
 
 ```
 
-```{r 3ngrams}
+```{r 3ngrams, warning=FALSE, message=FALSE, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE}
 
 # 3 grams
 trigram = corpo1 %>% unnest_tokens(trigram ,value,token = "ngrams", n=3)
@@ -204,11 +210,12 @@ trigraph  = trigraph  +  scale_y_continuous(breaks = seq(0.0,1, by= 0.1), labels
   xlab("Number of Trigrams") +
   theme(legend.position="bottom")+
   scale_x_continuous(trans = 'log2',labels = comma, breaks = 4^(0:10) )+
-  stat_smooth(method = "loess")
+  stat_smooth(method = "loess")+
+  theme(axis.text.x = element_text(angle=90, hjust=1)) 
 
 ```
 
-```{r countingnonenglish}
+```{r countingnonenglish, warning=FALSE, message=FALSE, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE}
 
 #get the english dictionary
 download.file('https://raw.githubusercontent.com/dwyl/english-words/master/words3.txt',destfile = "dictionary.txt")
@@ -283,102 +290,113 @@ SummaryCleaning = SummaryCleaning %>% mutate(Word_Per = Cases/max(Cases)*100)
 
 ```
 
-```{r loss of bigrams}
-nrow(bigram)
+```{r loss of bigrams, warning=FALSE, message=FALSE, include = FALSE, echo = FALSE, cache = TRUE, results='hide', tidy=TRUE}
 
+filtered_bi = semi_join(semi_join(countingbigrams,englishwordcountcorpo1,by = c("word1" = "word")),englishwordcountcorpo1,by = c("word2" = "word")) 
 
+text= c("Original database","After filtering"); coltext = c("Number of bigrams","Coverage %"); 
+cases = c(nrow(countingbigrams),nrow(filtered_bi))
+coverage = c(sum(countingbigrams$n)/sum(countingbigrams$n),sum(filtered_bi$n)/sum(countingbigrams$n))
+SummaryLoss =  cbind.data.frame(text,cases,coverage) %>% mutate(casesper = cases/max(cases))
+SummaryLoss
 
 ```
-
-
-
-  
-####################################################################
 
 # Exploratory Data Analysis for the Data Science Capstone Project
 
-The exploratory data analysis for the english related data provided [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip) starts with preprocessing of the data: the data is uncompressed (unziped), and one large vector is created for each database avaialable - Blogs, Newspapers and Twitter messages. The files are read and converted to a `tibble` - one tipe of `data.frame`. All databases are then joined using a package called `tidytext`. To reduce processing of this document, a 'tidy' corpora (one word per line) was created and is avaiable at [TODO].
+The exploratory data analysis for the english related data provided [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip) starts with preprocessing of the data: the data is uncompressed (unziped), and one large vector is created for each database avaialable - Blogs, Newspapers and Twitter messages. In order to reduce memory requirements,a sample of 40 thousand lines of the original files were taken for further processing.
 
-Here are some of the basic information about the databases. In general, the consolidated database has more than the estimated [500,000 words in English] (http://www.slate.com/articles/life/the_good_word/2006/04/word_count.html)
+The files are read and converted to a `tibble` - one tipe of `data.frame`. All databases are then joined using a package called `tidytext` - The summation of the databases is called `corpo`. 
 
-```{r, echo = FALSE, results='markup'}
+### Basic information about the databases.
+
+```{r, echo = FALSE,cache=TRUE, warning= FALSE, message=FALSE}
 datatable(cbind.data.frame(names,lines,words,unique_words = uniquewordscount[,2]),colnames = c('Database','Lines','Words','Unique Words')) %>% formatCurrency(c('lines','words','n_distinct(word)'),currency = "",digits = 0)
 ```
 
+
+###1) Some words are more frequent than others - what are the distributions of word frequencies?
+
 The plots for all the databases show a similar result - most of the words are lightly used, while some words are recurrently used.  
-```{r, echo = FALSE, cache = TRUE, results= 'markup', warning= FALSE, message=FALSE}
+
+```{r, echo = FALSE, cache = TRUE, warning= FALSE, message=FALSE}
 plotfrequency
 ```
 
+
+###2) How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+
 As it is possible to see on the graph below, the 3 databases have the same trend in terms of coverage - a small number of words are responsible for a large covergate of instances. 
-For example, 50% of instances are covered by 110 words in the blog, while 228 words in the news database. Only 1417 words cover 80% of all instances in Twitter, while 2357 words are required for news. 
+
+For example, 50% of instances are covered by hundred words (between 100 and 300) for all databases.  
+
 This demonstrates that though the trend is the same - a small number of words cover a large part of instances - the 'news' database requires more words to get to the same coverage. One reason could be type of content  - news are potentially more complex than twitter messages.
 
-```{r graph all word instances, results='markup'}
+```{r graph all word instances,  echo = FALSE,cache=TRUE, warning= FALSE, message=FALSE}
 a
 ```
 
 The top 100 words for all consolidated databases are displayed below - masculine and feminine pronoums have very distinct frequencies: 
 
-```{r, results='markup'}
+```{r, results='markup', echo = FALSE,cache=TRUE, warning= FALSE, message=FALSE}
 printbestwords
 ```
 
 
-```
+###3) What are the frequencies of 2-grams and 3-grams in the dataset?
 
-2) What are the frequencies of 2-grams and 3-grams in the dataset?
+Using the package 'tidytext', 2 and 3 grams were created. This sample shows the that 64 bigrams account for aprox. 5% of all bigrams instances. As words are combined, the factorial growth of potential can be noted - 256 bigrams are required to reach 10% of the coverage (4 times more word only doubling the coverage). More than 1024 bigrams are required to cover 20%, while to reach 40%, more than 16 thousand bigrams are required (16 times the number of bigrams to double the coverage from 20% to 40%). 
 
-Using the package 'tidytext', 2 and 3 grams were created, using a sample of 10% of all the databases. This sample shows the that 64 bigrams account for aprox. 5% of all bigrams instances. As words are combined, the factorial growth of potential can be noted - 256 bigrams are required to reach 10% of the coverage (4 times more word only doubling the coverage). More than 1024 bigrams are required to cover 20%, while to reach 40%, more than 16 thousand bigrams are required (16 times the number of bigrams to double the coverage from 20% to 40%). 
-Trigrams, on their turn, show a similar trend, but with a smaller coverage. 256 trigrams do not reach 2.5% of instances, and 16 thousand combinations reach only 11% of the coverage (compared to 40% of bigrams)
+Trigrams, on their turn, show a similar trend, but with a smaller coverage. 256 trigrams do not reach 2.5% of instances, and 16 thousand combinations reach only 11% of the coverage (compared to 40% of bigrams).
 
 The graph below displays the cumulative frequency of bigrams and trigrams: 
 
-```{r, results='asis', echo=FALSE}
+```{r, results='asis', echo = FALSE, cache=TRUE, warning= FALSE, message=FALSE}
  library(gridExtra)
  grid.arrange(bigraph, trigraph, ncol=2)
 ```
 
 It is possible to arrange bigrams and trigrams in network of words, as shown below. By looking the Bigram and Trigram network of more frequent words and the arrows, it is possible to see the usual relationship between words and expansions to n-grams of 4 and 5 workds, for example:
- - 'I'm going to be able'
- - 'this is going to be'
- - 'thanks for the best'
- - 'I will be a great'
 
-A future model can explore those relantionships and organize words by their proximity (clusters)
+ - 'I'm going to be able'  
+ - 'this is going to be'  
+ - 'thanks for the best'  
+ - 'I will be a great'  
 
-```{r bigramplot}
+A future model can explore those relantionships and organize words by their proximity (clusters):
+
+
+```{r bigramplot, echo = FALSE,cache=TRUE, warning= FALSE, message=FALSE, fig.width=10, fig.height=10}
 plot(bigram_graph , vertex.size=13, edge.arrow.size=0.2, main=maintwo, sub = subtwo)
 ```
 
-```{r trigramplot}
+```{r trigramplot, results= 'markup',, echo = FALSE,cache=TRUE, warning= FALSE, message=FALSE, fig.width=10, fig.height=10}
 plot(trigram_graph, vertex.size=13, edge.arrow.size=0.2, main=maintree, sub = subtree)
 ```
 
 
-4) How do you evaluate how many of the words come from foreign languages?
+###4) How do you evaluate how many of the words come from foreign languages?
 
-In order to clean the database (from foreign languagues and other misplaced character), a 5 step process was applied. 
- - 1. Replace symbols that look like the apostrophe - like the ``’‘`
- - 2. Remove words that in fact are just numbers
- - 3. Remove words that are references to webpages
- - 4. Remove words that have digits (e.g.: 2do, 2night)
- - 5. Remove words that appear to have characthers that would represent accents in other languagues than English
- - 6. Remove words that do not belong to a dictionary
+In order to clean the database (from foreign languagues and other misplaced character), a 5 step process was applied.   
+  1. Replace symbols that look like the apostrophe - like the ``’‘`  
+  2. Remove words that in fact are just numbers  
+  3. Remove words that are references to webpages  
+  4. Remove words that have digits (e.g.: 2do, 2night)  
+  5. Remove words that appear to have characthers that would represent accents in other languagues than English  
+  6. Remove words that do not belong to a dictionary  
 
 A summary of the results of each operation is displayed on the table below. Note that words that were not part of the dictionary represent 55% of the base, but account only for aprox. 4% of the coverage. In constrast, dictionary based words represent 32% of the words, and 93% of all coverage. 
    
 
-```{r}
+```{r, results = 'markup', echo = FALSE, cache=TRUE, warning= FALSE, message=FALSE}
 datatable(SummaryCleaning[c(1,2,5,3,4)],colnames = c('Step/Issue','Number of Words (Cases)','Word (%)','Coverage (%)','Example')) %>% formatCurrency('Cases',currency = "",digits = 0) %>% formatCurrency(c('Instance','Word_Per'), currency = "", digits = 2)
 ```
 
-5) Can you think of a way to increase the coverage -- identifying words that may not be in the corpora or using a smaller number of words
-in the dictionary to cover the same number of phrases?
+###5) Can you think of a way to increase the coverage -- identifying words that may not be in the corpora or using a smaller number of words in the dictionary to cover the same number of phrases?
 
-One way to think about the coverage is to understand the loss of bigrams by excluding non dictionary words.
+One way to think about the coverage is to understand the loss of bigrams by excluding non dictionary words. As the table below shows, the exclusion of bigrams would represent a loss of coverage of  `r format((1-SummaryLoss$coverage[2])*100,digits = 3)`%,  while excluding more than `r format((1-SummaryLoss$casesper[2])*100,digits = 3)`% of bigrams and excluding more than 50% of words - an acceptable trade off between coverage and number of words.
 
-```{r}
-
+```{r, results = 'markup', echo = FALSE, cache=TRUE, warning= FALSE, message=FALSE}
+datatable(SummaryLoss[c(1,2,4,3)],colnames = c('Event','Bigram Cases','% of Bigrams','Coverage/Instance%')) %>% formatPercentage(c('casesper','coverage')) %>% formatCurrency('cases',currency = "", digits = 0)
 ```
 
