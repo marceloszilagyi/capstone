@@ -5,13 +5,9 @@ date: "11/16/2016"
 output: html_document
 ---
 
-
 ```{r setup, include = FALSE, echo = FALSE, cache = TRUE, results='hide'}
 knitr::opts_chunk$set(echo = TRUE, include=FALSE, cache = TRUE)
 ```
-###########
-
-The exploratory data analysis for the english related data provided [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip') starts with preprocessing of the data: the data is uncompressed (unziped), and one large vector is created for each database avaialable - Blogs, Newspapers and Twitter messages. The files are read and converted to a `tibble` - one tipe of `data.frame`. All database are then joined using a package called `tidytext`.
 
 ```{r load libraries, warning=FALSE, message=FALSE}
 listpackages = c('data.table', 'tidytext', 'magrittr', 'dplyr', 'dtplyr', 'tibble', 'tm', 'stringr', 'ggplot2','scales','DT', 'tidyr', 'igraph','magrittr','gridExtra','readr')
@@ -58,9 +54,11 @@ corpo = bind_rows(twitter,news,blogs)
 # create basic stats
 names = c('blogs','news','twitter','corpo')
 lines = c(nrow(blogs),nrow(news),nrow(twitter),nrow(corpo))
+rm(twitter)
+rm(blogs)
+rm(news)
 
 ```
-
 
 ```{r count_words}
 
@@ -90,7 +88,7 @@ bestwords = temp %>% group_by(word) %>% summarize(n2 = sum(n), total2 = sum(tota
 first20 = bestwords[1:20,1]; colnames(first20) <- "1st to 20th"
 `21_to_40` = bestwords[21:40,1]; colnames(`21_to_40`) <-  "21st to 40th"
 `41_to_60` = bestwords[41:60,1]; colnames(`41_to_60`) <-  "41st to 60th"
-`61_to_60` = bestwords[61:80,1]; colnames(`61_to_80`) <-  "61st to 80th"
+`61_to_80` = bestwords[61:80,1]; colnames(`61_to_80`) <-  "61st to 80th"
 `81_to_100` = bestwords[81:100,1]; colnames(`81_to_100`) <-  "80th to 100th"
 
 printbestwords = datatable(cbind(first20,`21_to_40`,`41_to_60`,`61_to_80`,`81_to_100` ),autoHideNavigation = TRUE,rownames = FALSE)
@@ -130,15 +128,17 @@ a = a +  annotate("text", x= almostallinfo$count[1]-1000, y=almostallinfo$cumula
 
 ```
 
-
 ```{r 2ngrams}
 
 # need to reduce the size of the database - I reduced to 10% of the size
-corpo1 = corpo %>% group_by(origin) %>% sample_frac(0.1) %>% ungroup()
+ifelse(nrow(corpo)>1e+6, 
+       corpo1 = corpo %>% group_by(origin) %>% sample_frac(0.1) %>% ungroup(),
+       corpo1 = corpo)
 
 bigram = corpo1 %>% unnest_tokens(bigram,value,token = "ngrams", n=2)
 splitwords = as_tibble(str_split(bigram$bigram," ",simplify = TRUE))
 bigram  = bind_cols(bigram, splitwords) %>% rename(word1 = V1, word2 = V2)
+rm(splitwords)
 
 # basic counting
 countingbigrams = count(bigram,bigram,word1,word2,sort=TRUE)
@@ -178,6 +178,7 @@ bigraph  = bigraph  +  scale_y_continuous(breaks = seq(0.0,1, by= 0.1), labels =
 trigram = corpo1 %>% unnest_tokens(trigram ,value,token = "ngrams", n=3)
 trisplitwords = as_tibble(str_split(trigram$trigram," ",simplify = TRUE))
 trigram  = bind_cols(trigram, trisplitwords) %>% rename(word1 = V1, word2 = V2, word3 = V3)
+rm(trisplitwords)
 
 # basic counting
 countingtrigrams = count(trigram, trigram, word1, word2, word3, sort=TRUE)
@@ -207,90 +208,85 @@ trigraph  = trigraph  +  scale_y_continuous(breaks = seq(0.0,1, by= 0.1), labels
 
 ```
 
-
-
 ```{r countingnonenglish}
-wordcountcorpo1 = corpo1 %>% unnest_tokens(word ,value) %>% count(word, sort = TRUE) %>% ungroup()                  
 
 #get the english dictionary
 download.file('https://raw.githubusercontent.com/dwyl/english-words/master/words3.txt',destfile = "dictionary.txt")
 dictionary = read_csv("dictionary.txt",col_names = "word")
 dictionary  = dictionary %>% mutate(dictionary="dictionary")
-
-# example of strategies
-# subset  non dictionary words to further analysis
- nonenglish <- wordcountcorpo1 %>% anti_join(dictionary,by = "word") %>% ungroup() %>% count(word, sort = TRUE)
-
-# a lot of 'non english words' are in just just ''s' to (possessive)
- # only numbers
- grep(nonenglish$word,pattern = "[^0-9A-Z\',.-]
- 
-grep("[`’‘]",nonenglish$word,value = TRUE) %>% grep(pattern = "\\W", value = TRUE) 
-     
-     
+problemsummary = data.frame()
 
 
+wordcountcorpo1 = corpo1 %>% unnest_tokens(word ,value) %>% count(word, sort = TRUE) %>% ungroup()
+p0n=nrow(wordcountcorpo1)
+ref = sum(wordcountcorpo1$n)
+   p0e = wordcountcorpo1 %>% select(word) %>% sample_n(20)
+   p0c = 100
 
-
-
-
-#using negative join, get the non-english 
-# remove 's from the database
- nonenglish <- wordcountcorpo1 %>% anti_join(dictionary,by = "word") %>% ungroup() %>% count(word, sort = TRUE)
-
-# create a play df just for display purposes 
-   play = sample_n(wordcountcorpo1,10000)
+   # problem number 1 - the 's' problem
+   p1n = sum(str_count(pattern = "[`’‘]",string = wordcountcorpo1$word))
+   p1e = wordcountcorpo1 %>% filter(grepl("[`’‘]", word)) %>% sample_n(20)
+   p1c = wordcountcorpo1 %>% filter(grepl("[`’‘]", word)) %>% summarize(nn= 100*sum(n)/ref)
+   wordcountcorpo1$word = gsub(pattern = "[`’‘]",replacement = "'", x = wordcountcorpo1$word)
    
-   grep(play$word, pattern = "[^a-z0-9A-Z\',.-]", value = TRUE, invert = TRUE)
-    grep(play$word, pattern = "['`’‘]", value = TRUE)
+   # problem number 2 - only numbers
+   numbers = "^-?\\d+(,\\d+)*(\\.\\d+(e\\d+)?)?$"
+   p2n = sum(str_count(pattern = numbers ,string = wordcountcorpo1$word))
+   p2e = wordcountcorpo1 %>% filter(grepl(numbers, word)) %>% sample_n(20,replace = FALSE)
+   p2c = wordcountcorpo1 %>% filter(grepl(numbers, word)) %>% summarize(nn= 100*sum(n)/ref)
+   wordcountcorpo1 <- wordcountcorpo1 %>% filter(!grepl(pattern = numbers, x = wordcountcorpo1$word))
+
+   # problem number 3 - web references
+   web = "\\w\\.{1}\\D{2,3}$"
+   p3n = sum(str_count(pattern = web ,string = wordcountcorpo1$word))
+   p3e = wordcountcorpo1 %>% filter(grepl(web, word)) %>% sample_n(20)
+   p3c = wordcountcorpo1 %>% filter(grepl(web, word)) %>% summarize(nn= 100*sum(n)/ref)
+   wordcountcorpo1 <- wordcountcorpo1 %>% filter(!grepl(pattern = web, x = wordcountcorpo1$word))
    
+   #problem number 4 - numbers in the middle of words
+   mid = "\\d"
+   p4n = sum(str_count(pattern = mid ,string = wordcountcorpo1$word))
+   p4e = wordcountcorpo1 %>% filter(grepl(mid, word)) %>% sample_n(20)
+   p4c = wordcountcorpo1 %>% filter(grepl(mid, word)) %>% summarize(nn= 100*sum(n)/ref)  
+   wordcountcorpo1 <- wordcountcorpo1 %>% filter(!grepl(pattern = mid, x = wordcountcorpo1$word))
+   
+   #problem number 5 - words with foreign character()
+   
+   foreign = "[^0-9A-Za-z\\.']"
+   p5n = sum(str_count(pattern = foreign ,string = wordcountcorpo1$word))
+   p5e = wordcountcorpo1 %>% filter(grepl(foreign, word)) %>% sample_n(20)
+   p5c = wordcountcorpo1 %>% filter(grepl(foreign, word)) %>% summarize(nn= 100*sum(n)/ref)     
+   wordcountcorpo1 <- wordcountcorpo1 %>% filter(!grepl(pattern = foreign, x = wordcountcorpo1$word))
+   
+  # dictionary removal
+   
+  nonenglishwordcountcorpo1 <- wordcountcorpo1 %>% anti_join(dictionary,by = "word") %>% ungroup() %>% arrange(desc(n))
+  p6n = nrow(nonenglishwordcountcorpo1)
+  p6e = sample_n(nonenglishwordcountcorpo1,20)
+  p6c = sum(nonenglishwordcountcorpo1$n)/ref*100
+  
+  englishwordcountcorpo1 <- wordcountcorpo1 %>% inner_join(dictionary,by = "word") %>% ungroup() %>% arrange(desc(n))
+  p7n = nrow(englishwordcountcorpo1)
+  p7e = sample_n(englishwordcountcorpo1,20)
+  p7c = sum(englishwordcountcorpo1$n)/ref*100
+  
 
-  simbolnonenglish = grep("[[:punct:]]", nonenglish$word, value = TRUE)
+Actions = c("Original Base","Wrong format","Only numbers","Web References","Word Number mix","Foreign chars","Not on dictionary","Dictionary words")
+Cases = c(p0n,p1n,p2n,p3n,p4n,p5n,p6n,p7n)
 
-# play with regex
-  # objective - learn how to correct cases with 's
-  
-  # objective - learn how to identify only non word chars
-  
-  #objective - learn how to identify foreign charaters 
-  grep(play$word, pattern = "[^a-z0-9A-Z\',.-]", value = TRUE)
-  
-  # objective - learn how to identify words with only foreign chars 
-  
+Examples = c(paste(p0e$word,collapse=" ,"),paste(p1e$word,collapse=" ,"),paste(p2e$word,collapse=" ,"),paste(p3e$word,collapse=" ,"),paste(p4e$word,collapse=" ,"),paste(p5e$word,collapse=" ,"),paste(p6e$word,collapse=" ,"),paste(p7e$word,collapse=" ,"))
 
-  
-  grep("[[:punct:]]", nonenglish$word, value = TRUE)
-  
-  
-  
-c(nrow(wordcountcorpo1), nrow(dictionary), nrow(nonenglish))
+Instance = unlist(c(p0c,p1c,p2c,p3c,p4c,p5c,p6c,p7c))
+
+SummaryCleaning = cbind.data.frame(Actions,Cases,Instance,Examples)
+SummaryCleaning = SummaryCleaning %>% mutate(Word_Per = Cases/max(Cases)*100)
 
 ```
 
+```{r loss of bigrams}
+nrow(bigram)
 
 
-
-
-
-
-```{r}
-
-# frequency without bad words
-f1 = wordbyword %>% anti_join(badwords, by = "word") %>% count(word, sort = TRUE) 
-
-#frequency without stop words
-f2 = f1 %>% anti_join(stop_words, by = "word") 
-
-
-count(word, sort = TRUE)
-
-
-  k <- j %>% as_tibble() %>% unnest_tokens(word, text) %>% 
-            anti_join(stop_words,by = "word") %>% 
-    anti_join(badwords, by = "word")
-  
-  # return the tokenization
-  k %>% count(word, sort = TRUE)
 
 ```
 
@@ -329,13 +325,6 @@ printbestwords
 ```
 
 
-A lot of "words" with only one frequency are just non English characthers, for example: 
-
-```{r pending }
-
-```
-
-
 ```
 
 2) What are the frequencies of 2-grams and 3-grams in the dataset?
@@ -356,7 +345,7 @@ It is possible to arrange bigrams and trigrams in network of words, as shown bel
  - 'thanks for the best'
  - 'I will be a great'
 
-A future model can explore those relantionships and organize words by their proximity  
+A future model can explore those relantionships and organize words by their proximity (clusters)
 
 ```{r bigramplot}
 plot(bigram_graph , vertex.size=13, edge.arrow.size=0.2, main=maintwo, sub = subtwo)
@@ -368,14 +357,27 @@ plot(trigram_graph, vertex.size=13, edge.arrow.size=0.2, main=maintree, sub = su
 
 
 4) How do you evaluate how many of the words come from foreign languages?
-It is possible to evaluate the words coming from foreing language by matching the existing database of words against a list of [english words](https://github.com/dwyl/english-words/blob/master/words.txt) or eliminate  words that are only composed by special characters. Based on a sample of 10% of the total 
+
+In order to clean the database (from foreign languagues and other misplaced character), a 5 step process was applied. 
+ - 1. Replace symbols that look like the apostrophe - like the ``’‘`
+ - 2. Remove words that in fact are just numbers
+ - 3. Remove words that are references to webpages
+ - 4. Remove words that have digits (e.g.: 2do, 2night)
+ - 5. Remove words that appear to have characthers that would represent accents in other languagues than English
+ - 6. Remove words that do not belong to a dictionary
+
+A summary of the results of each operation is displayed on the table below. Note that words that were not part of the dictionary represent 55% of the base, but account only for aprox. 4% of the coverage. In constrast, dictionary based words represent 32% of the words, and 93% of all coverage. 
+   
 
 ```{r}
-
+datatable(SummaryCleaning[c(1,2,5,3,4)],colnames = c('Step/Issue','Number of Words (Cases)','Word (%)','Coverage (%)','Example')) %>% formatCurrency('Cases',currency = "",digits = 0) %>% formatCurrency(c('Instance','Word_Per'), currency = "", digits = 2)
 ```
 
 5) Can you think of a way to increase the coverage -- identifying words that may not be in the corpora or using a smaller number of words
 in the dictionary to cover the same number of phrases?
+
+One way to think about the coverage is to understand the loss of bigrams by excluding non dictionary words.
+
 ```{r}
 
 ```
